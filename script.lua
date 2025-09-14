@@ -1,5 +1,5 @@
 -- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION zs
+-- FINAL COMBINED VERSION zss
 
 -- Services
 local Players = game:GetService("Players")
