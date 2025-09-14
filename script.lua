@@ -121,7 +121,7 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input, ga
     end
 end))
 
--- Enhanced Kill Aura with Debug
+-- Enhanced Kill Aura with Multiple Attack Methods
 table.insert(connections, RunService.Heartbeat:Connect(function()
     if not isAuraEnabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then 
         return 
@@ -154,9 +154,6 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         end
     end
     
-    -- More flexible weapon detection - check if it's any tool or specific weapon
-    local isWeapon = true -- Assume any tool can be a weapon
-    
     -- Look for various types of events and functions in the tool
     local damageEvent = tool:FindFirstChild("DamageEvent") or 
                        tool:FindFirstChild("RemoteEvent") or
@@ -175,16 +172,16 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                      handle:FindFirstChild("Hit")
     end
     
-    -- Debug: Print damage event found
-    if damageEvent and not damageEvent:GetAttribute("DebugPrinted") then
-        print("Kill Aura: Found damage event -", damageEvent.Name, damageEvent.ClassName)
-        damageEvent:SetAttribute("DebugPrinted", true)
-    end
+    -- Look for scripts that might handle damage
+    local toolScript = tool:FindFirstChild("Script") or tool:FindFirstChild("LocalScript")
     
     local playerPos = player.Character.HumanoidRootPart.Position
     local foundTarget = false
     
-    -- Find targets more efficiently
+    -- Find targets more efficiently - Check both players and NPCs
+    local allTargets = {}
+    
+    -- Add players to targets
     for _, otherPlayer in ipairs(Players:GetPlayers()) do
         if otherPlayer ~= player and otherPlayer.Character then
             local targetHumanoid = otherPlayer.Character:FindFirstChild("Humanoid")
@@ -192,55 +189,21 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             
             if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
                 local distance = (playerPos - targetRoot.Position).Magnitude
-                
                 if distance <= currentAuraRadius then
-                    foundTarget = true
-                    print("Kill Aura: Targeting player", otherPlayer.Name, "at distance", math.floor(distance))
-                    
-                    -- Reduced debounce time for faster hitting
-                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.05 then
-                        auraTargetDebounce[targetHumanoid] = tick()
-                        
-                        -- Try different ways to fire the damage event
-                        if damageEvent and damageEvent:IsA("RemoteEvent") then
-                            pcall(function()
-                                damageEvent:FireServer(targetHumanoid)
-                                print("Kill Aura: Fired damage event with targetHumanoid")
-                            end)
-                            pcall(function()
-                                damageEvent:FireServer(otherPlayer.Character)
-                                print("Kill Aura: Fired damage event with character")
-                            end)
-                            pcall(function()
-                                damageEvent:FireServer(targetRoot)
-                                print("Kill Aura: Fired damage event with root")
-                            end)
-                            pcall(function()
-                                damageEvent:FireServer()
-                                print("Kill Aura: Fired damage event with no args")
-                            end)
-                        end
-                        
-                        -- Try tool activation methods
-                        pcall(function()
-                            tool:Activate()
-                            print("Kill Aura: Activated tool")
-                        end)
-                        
-                        -- Try direct damage if tool has a damage function
-                        if tool:FindFirstChild("Damage") and tool.Damage:IsA("RemoteFunction") then
-                            pcall(function()
-                                tool.Damage:InvokeServer(targetHumanoid)
-                                print("Kill Aura: Invoked damage function")
-                            end)
-                        end
-                    end
+                    table.insert(allTargets, {
+                        type = "Player",
+                        name = otherPlayer.Name,
+                        character = otherPlayer.Character,
+                        humanoid = targetHumanoid,
+                        root = targetRoot,
+                        distance = distance
+                    })
                 end
             end
         end
     end
     
-    -- Also check NPCs/Monsters in workspace (like rabbits/zombies)
+    -- Add NPCs to targets (like rabbits/zombies)
     for _, obj in ipairs(workspace:GetChildren()) do
         if obj:IsA("Model") and obj ~= player.Character and obj.Name ~= "Camera" then
             local targetHumanoid = obj:FindFirstChild("Humanoid")
@@ -248,48 +211,93 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             
             if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
                 local distance = (playerPos - targetRoot.Position).Magnitude
-                
                 if distance <= currentAuraRadius then
-                    foundTarget = true
-                    print("Kill Aura: Targeting NPC", obj.Name, "at distance", math.floor(distance))
-                    
-                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.05 then
-                        auraTargetDebounce[targetHumanoid] = tick()
-                        
-                        -- Try different ways to fire the damage event
-                        if damageEvent and damageEvent:IsA("RemoteEvent") then
-                            pcall(function()
-                                damageEvent:FireServer(targetHumanoid)
-                                print("Kill Aura: Fired damage event at NPC humanoid")
-                            end)
-                            pcall(function()
-                                damageEvent:FireServer(obj)
-                                print("Kill Aura: Fired damage event at NPC model")
-                            end)
-                            pcall(function()
-                                damageEvent:FireServer(targetRoot)
-                                print("Kill Aura: Fired damage event at NPC root")
-                            end)
-                            pcall(function()
-                                damageEvent:FireServer()
-                                print("Kill Aura: Fired damage event with no args")
-                            end)
-                        end
-                        
-                        -- Try tool activation
-                        pcall(function()
-                            tool:Activate()
-                            print("Kill Aura: Activated tool for NPC")
-                        end)
-                        
-                        -- Try direct damage
-                        if tool:FindFirstChild("Damage") and tool.Damage:IsA("RemoteFunction") then
-                            pcall(function()
-                                tool.Damage:InvokeServer(targetHumanoid)
-                                print("Kill Aura: Invoked damage function for NPC")
-                            end)
-                        end
-                    end
+                    table.insert(allTargets, {
+                        type = "NPC",
+                        name = obj.Name,
+                        character = obj,
+                        humanoid = targetHumanoid,
+                        root = targetRoot,
+                        distance = distance
+                    })
+                end
+            end
+        end
+    end
+    
+    -- Attack all targets found
+    for _, target in ipairs(allTargets) do
+        foundTarget = true
+        print("Kill Aura: Targeting", target.type, target.name, "at distance", math.floor(target.distance))
+        
+        if not auraTargetDebounce[target.humanoid] or tick() - auraTargetDebounce[target.humanoid] > 0.1 then
+            auraTargetDebounce[target.humanoid] = tick()
+            
+            -- Method 1: Try RemoteEvent if found
+            if damageEvent and damageEvent:IsA("RemoteEvent") then
+                pcall(function()
+                    damageEvent:FireServer(target.humanoid)
+                    print("Kill Aura: Fired RemoteEvent with humanoid")
+                end)
+                pcall(function()
+                    damageEvent:FireServer(target.character)
+                    print("Kill Aura: Fired RemoteEvent with character")
+                end)
+                pcall(function()
+                    damageEvent:FireServer(target.root)
+                    print("Kill Aura: Fired RemoteEvent with root")
+                end)
+            end
+            
+            -- Method 2: Tool Activation (most common for tools)
+            pcall(function()
+                tool:Activate()
+                print("Kill Aura: Activated tool")
+            end)
+            
+            -- Method 3: Simulate mouse click on target
+            pcall(function()
+                tool:FireServer("MouseClick", target.root.Position)
+                print("Kill Aura: Fired MouseClick")
+            end)
+            
+            -- Method 4: Try touching the target with the tool handle
+            if handle then
+                pcall(function()
+                    -- Temporarily move handle to target position
+                    local originalCFrame = handle.CFrame
+                    handle.CFrame = target.root.CFrame
+                    wait(0.01)
+                    handle.CFrame = originalCFrame
+                    print("Kill Aura: Moved handle to target")
+                end)
+            end
+            
+            -- Method 5: Direct damage to humanoid (if possible)
+            pcall(function()
+                target.humanoid:TakeDamage(10)
+                print("Kill Aura: Applied direct damage")
+            end)
+            
+            -- Method 6: Try common weapon event names
+            local commonEvents = {"Hit", "Damage", "Attack", "Strike", "Swing"}
+            for _, eventName in ipairs(commonEvents) do
+                local event = tool:FindFirstChild(eventName)
+                if event and event:IsA("RemoteEvent") then
+                    pcall(function()
+                        event:FireServer(target.humanoid)
+                        print("Kill Aura: Fired", eventName, "event")
+                    end)
+                end
+            end
+            
+            -- Method 7: Try BindableEvent for local tools
+            for _, child in ipairs(tool:GetChildren()) do
+                if child:IsA("BindableEvent") then
+                    pcall(function()
+                        child:Fire(target.humanoid)
+                        print("Kill Aura: Fired BindableEvent", child.Name)
+                    end)
                 end
             end
         end
@@ -298,9 +306,23 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
     -- Debug: Print if no targets found
     if not foundTarget and tool:GetAttribute("DebugPrinted") then
         -- Only print occasionally to avoid spam
-        if not tool:GetAttribute("LastNoTargetPrint") or tick() - tool:GetAttribute("LastNoTargetPrint") > 2 then
+        if not tool:GetAttribute("LastNoTargetPrint") or tick() - tool:GetAttribute("LastNoTargetPrint") > 3 then
             print("Kill Aura: No targets found within radius", currentAuraRadius)
             tool:SetAttribute("LastNoTargetPrint", tick())
+            
+            -- Debug: List nearby objects to help understand what's around
+            print("Nearby objects:")
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and obj ~= player.Character then
+                    local objRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
+                    if objRoot then
+                        local distance = (playerPos - objRoot.Position).Magnitude
+                        if distance <= 100 then -- Show objects within 100 studs
+                            print("  -", obj.Name, "at distance", math.floor(distance), "Health:", obj:FindFirstChild("Humanoid") and obj.Humanoid.Health or "No Humanoid")
+                        end
+                    end
+                end
+            end
         end
     end
 end))
