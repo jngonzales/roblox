@@ -331,10 +331,16 @@ end)
 
 -- --- CORE FUNCTIONALITY ---
 
--- Infinite Jump Functionality :cite[6]
+-- Infinite Jump Functionality
+local canJump = true
+local jumpCooldown = 0.2 -- Prevents spam
+
 UserInputService.JumpRequest:Connect(function()
-    if isInfJumpEnabled then
+    if isInfJumpEnabled and canJump then
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        canJump = false
+        task.wait(jumpCooldown)
+        canJump = true
     end
 end)
 
