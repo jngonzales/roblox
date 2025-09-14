@@ -1,5 +1,5 @@
 -- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION  dd
+-- FINAL COMBINED VERSION heh
 
 -- Services
 local Players = game:GetService("Players")
@@ -37,7 +37,7 @@ local WALK_SPEED_DEFAULT = 16
 local WEAPON_NAMES = { 
     "ClassicSword", "Axe", "Iron Hammer", "Sword", "Blade", "Knife", 
     "Dagger", "Spear", "Mace", "Club", "Staff", "Wand", "Bow", "Gun",
-    "Rifle", "Pistol", "Weapon", "Tool" -- Add more weapon names as needed
+    "Rifle", "Pistol", "Weapon", "Tool", "axe", "AXE" -- Add more weapon names as needed
 }
 
 -- State Variables
@@ -133,27 +133,37 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         return 
     end
     
-    -- Check if tool is a weapon (more flexible weapon detection)
-    local isWeapon = false
-    for _, weaponName in ipairs(WEAPON_NAMES) do
-        if string.find(tool.Name:lower(), weaponName:lower()) then
-            isWeapon = true
-            break
-        end
-    end
+    -- More flexible weapon detection - check if it's any tool or specific weapon
+    local isWeapon = true -- Assume any tool can be a weapon
+    
+    -- Optional: stricter checking if needed
+    -- for _, weaponName in ipairs(WEAPON_NAMES) do
+    --     if string.find(tool.Name:lower(), weaponName:lower()) then
+    --         isWeapon = true
+    --         break
+    --     end
+    -- end
     
     if not isWeapon then
         return
     end
     
-    -- Look for damage-related events in the tool
+    -- Look for various types of events and functions in the tool
     local damageEvent = tool:FindFirstChild("DamageEvent") or 
                        tool:FindFirstChild("RemoteEvent") or
                        tool:FindFirstChild("Damage") or
-                       tool:FindFirstChild("Hit")
+                       tool:FindFirstChild("Hit") or
+                       tool:FindFirstChild("OnHit") or
+                       tool:FindFirstChild("Attack") or
+                       tool:FindFirstChild("Strike")
     
-    if not damageEvent or not damageEvent:IsA("RemoteEvent") then
-        return
+    -- Also check tool handle for events
+    local handle = tool:FindFirstChild("Handle")
+    if not damageEvent and handle then
+        damageEvent = handle:FindFirstChild("DamageEvent") or
+                     handle:FindFirstChild("RemoteEvent") or
+                     handle:FindFirstChild("Damage") or
+                     handle:FindFirstChild("Hit")
     end
     
     local playerPos = player.Character.HumanoidRootPart.Position
@@ -168,48 +178,83 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                 local distance = (playerPos - targetRoot.Position).Magnitude
                 
                 if distance <= currentAuraRadius then
-                    -- Use debounce to prevent spam
-                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.1 then
+                    -- Reduced debounce time for faster hitting
+                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.05 then
                         auraTargetDebounce[targetHumanoid] = tick()
                         
                         -- Try different ways to fire the damage event
+                        if damageEvent and damageEvent:IsA("RemoteEvent") then
+                            pcall(function()
+                                damageEvent:FireServer(targetHumanoid)
+                            end)
+                            pcall(function()
+                                damageEvent:FireServer(otherPlayer.Character)
+                            end)
+                            pcall(function()
+                                damageEvent:FireServer(targetRoot)
+                            end)
+                            pcall(function()
+                                damageEvent:FireServer()
+                            end)
+                        end
+                        
+                        -- Try tool activation methods
                         pcall(function()
-                            damageEvent:FireServer(targetHumanoid)
+                            tool:Activate()
                         end)
-                        pcall(function()
-                            damageEvent:FireServer(otherPlayer.Character)
-                        end)
-                        pcall(function()
-                            damageEvent:FireServer(targetRoot)
-                        end)
+                        
+                        -- Try direct damage if tool has a damage function
+                        if tool:FindFirstChild("Damage") and tool.Damage:IsA("RemoteFunction") then
+                            pcall(function()
+                                tool.Damage:InvokeServer(targetHumanoid)
+                            end)
+                        end
                     end
                 end
             end
         end
     end
     
-    -- Also check NPCs/Monsters in workspace
+    -- Also check NPCs/Monsters in workspace (like rabbits/zombies)
     for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and obj ~= player.Character then
+        if obj:IsA("Model") and obj ~= player.Character and obj.Name ~= "Camera" then
             local targetHumanoid = obj:FindFirstChild("Humanoid")
-            local targetRoot = obj:FindFirstChild("HumanoidRootPart")
+            local targetRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso")
             
             if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
                 local distance = (playerPos - targetRoot.Position).Magnitude
                 
                 if distance <= currentAuraRadius then
-                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.1 then
+                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.05 then
                         auraTargetDebounce[targetHumanoid] = tick()
                         
+                        -- Try different ways to fire the damage event
+                        if damageEvent and damageEvent:IsA("RemoteEvent") then
+                            pcall(function()
+                                damageEvent:FireServer(targetHumanoid)
+                            end)
+                            pcall(function()
+                                damageEvent:FireServer(obj)
+                            end)
+                            pcall(function()
+                                damageEvent:FireServer(targetRoot)
+                            end)
+                            pcall(function()
+                                damageEvent:FireServer()
+                            end)
+                        end
+                        
+                        -- Try tool activation
                         pcall(function()
-                            damageEvent:FireServer(targetHumanoid)
+                            tool:Activate()
                         end)
-                        pcall(function()
-                            damageEvent:FireServer(obj)
-                        end)
-                        pcall(function()
-                            damageEvent:FireServer(targetRoot)
-                        end)
+                        
+                        -- Try direct damage
+                        if tool:FindFirstChild("Damage") and tool.Damage:IsA("RemoteFunction") then
+                            pcall(function()
+                                tool.Damage:InvokeServer(targetHumanoid)
+                            end)
+                        end
                     end
                 end
             end
