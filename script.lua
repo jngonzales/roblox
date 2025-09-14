@@ -1,5 +1,5 @@
 -- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION dss
+-- FINAL COMBINED VERSION
 
 -- Services
 local Players = game:GetService("Players")
@@ -20,6 +20,11 @@ table.insert(connections, player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoid = newCharacter:WaitForChild("Humanoid")
     humanoid.WalkSpeed = currentWalkSpeed -- Reapply walk speed on respawn
+    
+    -- Reapply infinite jump capability
+    if isInfJumpEnabled then
+        humanoid.JumpHeight = 50 -- Ensure jump height is set
+    end
 end))
 
 -- Configuration
@@ -29,7 +34,11 @@ local AURA_RADIUS_DEFAULT = 50
 local WALK_SPEED_MIN = 16
 local WALK_SPEED_MAX = 100
 local WALK_SPEED_DEFAULT = 16
-local WEAPON_NAMES = { "ClassicSword", "Axe", "Iron Hammer" } -- Add your tool names here
+local WEAPON_NAMES = { 
+    "ClassicSword", "Axe", "Iron Hammer", "Sword", "Blade", "Knife", 
+    "Dagger", "Spear", "Mace", "Club", "Staff", "Wand", "Bow", "Gun",
+    "Rifle", "Pistol", "Weapon", "Tool" -- Add more weapon names as needed
+}
 
 -- State Variables
 local isInfJumpEnabled = false
@@ -95,8 +104,118 @@ createSliderLogic(speedSliderHandle,speedSliderTrack,WALK_SPEED_MIN,WALK_SPEED_M
 local isDraggingWindow,dragStart,startPos=false table.insert(connections,titleLabel.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then isDraggingWindow,dragStart,startPos=true,i.Position,mainFrame.Position end end)) table.insert(connections,titleLabel.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then isDraggingWindow=false end end)) table.insert(connections,UserInputService.InputChanged:Connect(function(i) if isDraggingWindow and(i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch)then mainFrame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+(i.Position-dragStart).X,startPos.Y.Scale,startPos.Y.Offset+(i.Position-dragStart).Y)end end))
 
 -- --- CORE FUNCTIONALITY ---
-table.insert(connections,UserInputService.JumpRequest:Connect(function() if isInfJumpEnabled and humanoid and humanoid:GetState()~=Enum.HumanoidStateType.Dead then humanoid:ChangeState(Enum.HumanoidStateType.Jumping)end end))
-table.insert(connections,RunService.Heartbeat:Connect(function() if not isAuraEnabled or not player.Character or not player.Character.PrimaryPart then return end local tool=player.Character:FindFirstChildOfClass("Tool") if not tool or not table.find(WEAPON_NAMES,tool.Name)then return end local damageEvent=tool:FindFirstChild("DamageEvent") if not damageEvent or not damageEvent:IsA("RemoteEvent")then return end local playerPos=player.Character.PrimaryPart.Position for _,target in ipairs(workspace:GetDescendants())do if target:IsA("Humanoid")and target.Health>0 then local targetChar=target.Parent if targetChar~=player.Character and targetChar:FindFirstChild("HumanoidRootPart")then if(playerPos-targetChar.HumanoidRootPart.Position).Magnitude<=currentAuraRadius then if not auraTargetDebounce[target]or tick()-auraTargetDebounce[target]>0.2 then auraTargetDebounce[target]=tick() damageEvent:FireServer(target)end end end end end end))
+-- Improved Infinite Jump
+table.insert(connections, UserInputService.JumpRequest:Connect(function()
+    if isInfJumpEnabled and humanoid and humanoid.Health > 0 then
+        -- Allow jumping regardless of current state
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end))
+
+-- Additional jump input handling for better reliability
+table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.Space and isInfJumpEnabled and humanoid and humanoid.Health > 0 then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end))
+
+-- Enhanced Kill Aura
+table.insert(connections, RunService.Heartbeat:Connect(function()
+    if not isAuraEnabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then 
+        return 
+    end
+    
+    -- Get equipped tool
+    local tool = player.Character:FindFirstChildOfClass("Tool")
+    if not tool then 
+        return 
+    end
+    
+    -- Check if tool is a weapon (more flexible weapon detection)
+    local isWeapon = false
+    for _, weaponName in ipairs(WEAPON_NAMES) do
+        if string.find(tool.Name:lower(), weaponName:lower()) then
+            isWeapon = true
+            break
+        end
+    end
+    
+    if not isWeapon then
+        return
+    end
+    
+    -- Look for damage-related events in the tool
+    local damageEvent = tool:FindFirstChild("DamageEvent") or 
+                       tool:FindFirstChild("RemoteEvent") or
+                       tool:FindFirstChild("Damage") or
+                       tool:FindFirstChild("Hit")
+    
+    if not damageEvent or not damageEvent:IsA("RemoteEvent") then
+        return
+    end
+    
+    local playerPos = player.Character.HumanoidRootPart.Position
+    
+    -- Find targets more efficiently
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character then
+            local targetHumanoid = otherPlayer.Character:FindFirstChild("Humanoid")
+            local targetRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
+            if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
+                local distance = (playerPos - targetRoot.Position).Magnitude
+                
+                if distance <= currentAuraRadius then
+                    -- Use debounce to prevent spam
+                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.1 then
+                        auraTargetDebounce[targetHumanoid] = tick()
+                        
+                        -- Try different ways to fire the damage event
+                        pcall(function()
+                            damageEvent:FireServer(targetHumanoid)
+                        end)
+                        pcall(function()
+                            damageEvent:FireServer(otherPlayer.Character)
+                        end)
+                        pcall(function()
+                            damageEvent:FireServer(targetRoot)
+                        end)
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Also check NPCs/Monsters in workspace
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and obj ~= player.Character then
+            local targetHumanoid = obj:FindFirstChild("Humanoid")
+            local targetRoot = obj:FindFirstChild("HumanoidRootPart")
+            
+            if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
+                local distance = (playerPos - targetRoot.Position).Magnitude
+                
+                if distance <= currentAuraRadius then
+                    if not auraTargetDebounce[targetHumanoid] or tick() - auraTargetDebounce[targetHumanoid] > 0.1 then
+                        auraTargetDebounce[targetHumanoid] = tick()
+                        
+                        pcall(function()
+                            damageEvent:FireServer(targetHumanoid)
+                        end)
+                        pcall(function()
+                            damageEvent:FireServer(obj)
+                        end)
+                        pcall(function()
+                            damageEvent:FireServer(targetRoot)
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end))
 
 -- Initialize UI state
 updateToggleVisuals(infJumpToggle,isInfJumpEnabled) updateToggleVisuals(auraToggle,isAuraEnabled) humanoid.WalkSpeed=currentWalkSpeed
