@@ -203,11 +203,23 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         end
     end
     
-    -- Add NPCs to targets (like rabbits/zombies)
+    -- Add NPCs to targets (like rabbits/zombies) - More comprehensive search
     for _, obj in ipairs(workspace:GetChildren()) do
         if obj:IsA("Model") and obj ~= player.Character and obj.Name ~= "Camera" then
-            local targetHumanoid = obj:FindFirstChild("Humanoid")
-            local targetRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso")
+            -- Try multiple ways to find the humanoid and root part
+            local targetHumanoid = obj:FindFirstChild("Humanoid") or obj:FindFirstChildOfClass("Humanoid")
+            local targetRoot = obj:FindFirstChild("HumanoidRootPart") or 
+                              obj:FindFirstChild("Torso") or 
+                              obj:FindFirstChild("UpperTorso") or
+                              obj:FindFirstChild("Root") or
+                              obj:FindFirstChild("RootPart") or
+                              obj:FindFirstChildOfClass("Part")
+            
+            -- Also check if it's just a part with a humanoid parent
+            if not targetHumanoid and obj.Parent and obj.Parent:FindFirstChild("Humanoid") then
+                targetHumanoid = obj.Parent:FindFirstChild("Humanoid")
+                targetRoot = obj.Parent:FindFirstChild("HumanoidRootPart") or obj.Parent:FindFirstChild("Torso")
+            end
             
             if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
                 local distance = (playerPos - targetRoot.Position).Magnitude
@@ -220,6 +232,37 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                         root = targetRoot,
                         distance = distance
                     })
+                end
+            end
+        end
+    end
+    
+    -- Also search in folders and other containers
+    for _, folder in ipairs(workspace:GetChildren()) do
+        if folder:IsA("Folder") or folder:IsA("Model") then
+            for _, obj in ipairs(folder:GetChildren()) do
+                if obj:IsA("Model") and obj ~= player.Character then
+                    local targetHumanoid = obj:FindFirstChild("Humanoid") or obj:FindFirstChildOfClass("Humanoid")
+                    local targetRoot = obj:FindFirstChild("HumanoidRootPart") or 
+                                      obj:FindFirstChild("Torso") or 
+                                      obj:FindFirstChild("UpperTorso") or
+                                      obj:FindFirstChild("Root") or
+                                      obj:FindFirstChild("RootPart") or
+                                      obj:FindFirstChildOfClass("Part")
+                    
+                    if targetHumanoid and targetRoot and targetHumanoid.Health > 0 then
+                        local distance = (playerPos - targetRoot.Position).Magnitude
+                        if distance <= currentAuraRadius then
+                            table.insert(allTargets, {
+                                type = "NPC",
+                                name = obj.Name,
+                                character = obj,
+                                humanoid = targetHumanoid,
+                                root = targetRoot,
+                                distance = distance
+                            })
+                        end
+                    end
                 end
             end
         end
@@ -264,11 +307,29 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             -- Method 4: Try touching the target with the tool handle
             if handle then
                 pcall(function()
+                    -- Create a temporary connection to simulate touch
+                    local connection
+                    connection = handle.Touched:Connect(function(hit)
+                        if hit.Parent == target.character then
+                            print("Kill Aura: Handle touched target")
+                            connection:Disconnect()
+                        end
+                    end)
+                    
                     -- Temporarily move handle to target position
                     local originalCFrame = handle.CFrame
                     handle.CFrame = target.root.CFrame
                     wait(0.01)
                     handle.CFrame = originalCFrame
+                    
+                    -- Clean up connection after a short delay
+                    spawn(function()
+                        wait(0.1)
+                        if connection then
+                            connection:Disconnect()
+                        end
+                    end)
+                    
                     print("Kill Aura: Moved handle to target")
                 end)
             end
@@ -300,6 +361,49 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                     end)
                 end
             end
+            
+            -- Method 8: Try mouse events (some tools use Mouse.Hit)
+            pcall(function()
+                local mouse = player:GetMouse()
+                if mouse then
+                    mouse.Hit = target.root.CFrame
+                    tool:FireServer(mouse.Hit)
+                    print("Kill Aura: Fired mouse hit")
+                end
+            end)
+            
+            -- Method 9: Try script-based damage (look for functions in tool script)
+            if toolScript then
+                pcall(function()
+                    -- Try to find and call damage functions
+                    for _, func in ipairs({"damage", "hit", "attack", "strike"}) do
+                        if toolScript:FindFirstChild(func) then
+                            toolScript[func]:Fire(target.character)
+                            print("Kill Aura: Called script function", func)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+    
+    -- Additional fallback: Try to attack anything close by (if no humanoid targets found)
+    if #allTargets == 0 then
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj ~= player.Character and obj.Name ~= "Camera" then
+                local objRoot = obj:FindFirstChildOfClass("Part")
+                if objRoot then
+                    local distance = (playerPos - objRoot.Position).Magnitude
+                    if distance <= currentAuraRadius then
+                        -- Try basic tool activation on any nearby object
+                        pcall(function()
+                            tool:Activate()
+                            print("Kill Aura: Activated tool on nearby object", obj.Name)
+                        end)
+                        break -- Only try once per frame
+                    end
+                end
+            end
         end
     end
     
@@ -313,12 +417,54 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             -- Debug: List nearby objects to help understand what's around
             print("Nearby objects:")
             for _, obj in ipairs(workspace:GetChildren()) do
-                if obj:IsA("Model") and obj ~= player.Character then
-                    local objRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
-                    if objRoot then
+                if obj:IsA("Model") or obj:IsA("Part") or obj:IsA("Folder") then
+                    -- Check if it has a position we can measure distance to
+                    local objRoot = nil
+                    if obj:IsA("Part") then
+                        objRoot = obj
+                    elseif obj:IsA("Model") then
+                        objRoot = obj:FindFirstChild("HumanoidRootPart") or 
+                                 obj:FindFirstChild("Torso") or 
+                                 obj:FindFirstChild("UpperTorso") or
+                                 obj:FindFirstChild("Root") or
+                                 obj:FindFirstChildOfClass("Part")
+                    end
+                    
+                    if objRoot and objRoot.Position then
                         local distance = (playerPos - objRoot.Position).Magnitude
                         if distance <= 100 then -- Show objects within 100 studs
-                            print("  -", obj.Name, "at distance", math.floor(distance), "Health:", obj:FindFirstChild("Humanoid") and obj.Humanoid.Health or "No Humanoid")
+                            local hasHumanoid = obj:FindFirstChild("Humanoid") or obj:FindFirstChildOfClass("Humanoid")
+                            local health = hasHumanoid and hasHumanoid.Health or "No Humanoid"
+                            print("  -", obj.Name, obj.ClassName, "at distance", math.floor(distance), "Health:", health)
+                            
+                            -- Show children of models to understand structure
+                            if obj:IsA("Model") and distance <= 50 then
+                                for _, child in ipairs(obj:GetChildren()) do
+                                    print("    ->", child.Name, child.ClassName)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- Also check folders for nested objects
+            for _, folder in ipairs(workspace:GetChildren()) do
+                if folder:IsA("Folder") then
+                    print("Checking folder:", folder.Name)
+                    for _, obj in ipairs(folder:GetChildren()) do
+                        if obj:IsA("Model") then
+                            local objRoot = obj:FindFirstChild("HumanoidRootPart") or 
+                                           obj:FindFirstChild("Torso") or 
+                                           obj:FindFirstChildOfClass("Part")
+                            if objRoot then
+                                local distance = (playerPos - objRoot.Position).Magnitude
+                                if distance <= 100 then
+                                    local hasHumanoid = obj:FindFirstChild("Humanoid") or obj:FindFirstChildOfClass("Humanoid")
+                                    local health = hasHumanoid and hasHumanoid.Health or "No Humanoid"
+                                    print("  - [Folder]", obj.Name, "at distance", math.floor(distance), "Health:", health)
+                                end
+                            end
                         end
                     end
                 end
