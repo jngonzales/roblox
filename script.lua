@@ -4,6 +4,8 @@
     - Infinite Jump Toggle: Allows jumping in mid-air.
     - Kill Aura Toggle: Automatically damages nearby entities if a specified weapon is equipped.
     - Radius Slider: Adjusts the range of the Kill Aura.
+    - Speed Slider: Adjusts the player's movement speed.
+    - Draggable UI: The top title bar allows dragging the GUI around.
 
     Instructions:
     1. Create a "LocalScript" inside StarterPlayer > StarterPlayerScripts.
@@ -29,39 +31,44 @@ local humanoid = character:WaitForChild("Humanoid")
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoid = newCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = currentWalkSpeed -- Reapply walk speed on respawn
 end)
 
 -- Configuration
 local AURA_RADIUS_MIN = 10
 local AURA_RADIUS_MAX = 200
 local AURA_RADIUS_DEFAULT = 50
+local WALK_SPEED_MIN = 16
+local WALK_SPEED_MAX = 100
+local WALK_SPEED_DEFAULT = 16
 local TOOL_NAME_TO_CHECK = "ClassicSword" -- The name of the tool that enables the aura
 
 -- State Variables
 local isInfJumpEnabled = false
 local isAuraEnabled = false
 local currentAuraRadius = AURA_RADIUS_DEFAULT
+local currentWalkSpeed = WALK_SPEED_DEFAULT
 
 -- GUI Creation
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AdminToolGui"
-screenGui.ResetOnSpawn = false
+screenGui.ResetOnSpawn = false  -- Prevent GUI from resetting on character respawn :cite[4]
 screenGui.Parent = playerGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 300, 0, 180)
+mainFrame.Size = UDim2.new(0, 300, 0, 240)  -- Increased height for new slider
 mainFrame.Position = UDim2.new(0.5, -150, 0.1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 37, 40)
 mainFrame.BorderColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 2
 mainFrame.Active = true
-mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 local corner = Instance.new("UICorner", mainFrame)
 corner.CornerRadius = UDim.new(0, 8)
 
+-- Title bar for dragging
 local titleLabel = Instance.new("TextLabel", mainFrame)
 titleLabel.Name = "TitleLabel"
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
@@ -70,6 +77,7 @@ titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Text = "Admin Tool"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 18
+titleLabel.Active = true  -- Enable interaction for dragging
 local titleCorner = Instance.new("UICorner", titleLabel)
 titleCorner.CornerRadius = UDim.new(0, 8)
 
@@ -126,7 +134,7 @@ radiusLabel.Size = UDim2.new(1, -30, 0, 20)
 radiusLabel.Position = UDim2.new(0, 15, 0, 115)
 radiusLabel.BackgroundTransparency = 1
 radiusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-radiusLabel.Text = "Radius: " .. currentAuraRadius
+radiusLabel.Text = "Aura Radius: " .. currentAuraRadius
 radiusLabel.Font = Enum.Font.SourceSans
 radiusLabel.TextSize = 14
 radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -143,7 +151,7 @@ trackCorner.CornerRadius = UDim.new(0, 4)
 local radiusSliderHandle = Instance.new("ImageButton", radiusSliderTrack)
 radiusSliderHandle.Name = "RadiusSliderHandle"
 radiusSliderHandle.Size = UDim2.new(0, 18, 0, 18)
-radiusSliderHandle.Position = UDim2.new( (AURA_RADIUS_DEFAULT - AURA_RADIUS_MIN) / (AURA_RADIUS_MAX - AURA_RADIUS_MIN), -9, 0.5, -9)
+radiusSliderHandle.Position = UDim2.new((AURA_RADIUS_DEFAULT - AURA_RADIUS_MIN) / (AURA_RADIUS_MAX - AURA_RADIUS_MIN), -9, 0.5, -9)
 radiusSliderHandle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 radiusSliderHandle.Image = "rbxassetid://392630590"
 radiusSliderHandle.ImageColor3 = Color3.fromRGB(255, 80, 80)
@@ -151,6 +159,39 @@ radiusSliderHandle.ScaleType = Enum.ScaleType.Slice
 radiusSliderHandle.SliceCenter = Rect.new(100, 100, 100, 100)
 local handleCorner = Instance.new("UICorner", radiusSliderHandle)
 handleCorner.CornerRadius = UDim.new(1, 0)
+
+-- Speed Slider UI
+local speedLabel = Instance.new("TextLabel", mainFrame)
+speedLabel.Name = "SpeedLabel"
+speedLabel.Size = UDim2.new(1, -30, 0, 20)
+speedLabel.Position = UDim2.new(0, 15, 0, 165)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+speedLabel.Text = "Walk Speed: " .. currentWalkSpeed
+speedLabel.Font = Enum.Font.SourceSans
+speedLabel.TextSize = 14
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local speedSliderTrack = Instance.new("Frame", mainFrame)
+speedSliderTrack.Name = "SpeedSliderTrack"
+speedSliderTrack.Size = UDim2.new(1, -30, 0, 8)
+speedSliderTrack.Position = UDim2.new(0, 15, 0, 190)
+speedSliderTrack.BackgroundColor3 = Color3.fromRGB(25, 27, 30)
+speedSliderTrack.BorderColor3 = Color3.fromRGB(15, 15, 15)
+local speedTrackCorner = Instance.new("UICorner", speedSliderTrack)
+speedTrackCorner.CornerRadius = UDim.new(0, 4)
+
+local speedSliderHandle = Instance.new("ImageButton", speedSliderTrack)
+speedSliderHandle.Name = "SpeedSliderHandle"
+speedSliderHandle.Size = UDim2.new(0, 18, 0, 18)
+speedSliderHandle.Position = UDim2.new((WALK_SPEED_DEFAULT - WALK_SPEED_MIN) / (WALK_SPEED_MAX - WALK_SPEED_MIN), -9, 0.5, -9)
+speedSliderHandle.BackgroundColor3 = Color3.fromRGB(80, 180, 255)
+speedSliderHandle.Image = "rbxassetid://392630590"
+speedSliderHandle.ImageColor3 = Color3.fromRGB(80, 180, 255)
+speedSliderHandle.ScaleType = Enum.ScaleType.Slice
+speedSliderHandle.SliceCenter = Rect.new(100, 100, 100, 100)
+local speedHandleCorner = Instance.new("UICorner", speedSliderHandle)
+speedHandleCorner.CornerRadius = UDim.new(1, 0)
 
 -- --- GUI LOGIC ---
 
@@ -185,8 +226,8 @@ local function updateRadiusFromPosition()
     local handlePos = radiusSliderHandle.Position.X.Offset + (radiusSliderHandle.Size.X.Offset / 2)
     local percentage = math.clamp(handlePos / trackWidth, 0, 1)
     
-    currentAuraRadius = AURA_RADIUS_MIN + (percentage * (AURA_RADIUS_MAX - AURA_RADIUS_MIN))
-    radiusLabel.Text = "Radius: " .. math.floor(currentAuraRadius)
+    currentAuraRadius = math.floor(AURA_RADIUS_MIN + (percentage * (AURA_RADIUS_MAX - AURA_RADIUS_MIN)))
+    radiusLabel.Text = "Aura Radius: " .. currentAuraRadius
 end
 
 radiusSliderHandle.InputBegan:Connect(function(input)
@@ -201,6 +242,36 @@ radiusSliderHandle.InputEnded:Connect(function(input)
     end
 end)
 
+-- Speed Slider Logic
+local isDraggingSpeed = false
+
+local function updateSpeedFromPosition()
+    local trackWidth = speedSliderTrack.AbsoluteSize.X
+    local handlePos = speedSliderHandle.Position.X.Offset + (speedSliderHandle.Size.X.Offset / 2)
+    local percentage = math.clamp(handlePos / trackWidth, 0, 1)
+    
+    currentWalkSpeed = math.floor(WALK_SPEED_MIN + (percentage * (WALK_SPEED_MAX - WALK_SPEED_MIN)))
+    speedLabel.Text = "Walk Speed: " .. currentWalkSpeed
+    
+    -- Apply the speed change to the humanoid
+    if humanoid then
+        humanoid.WalkSpeed = currentWalkSpeed
+    end
+end
+
+speedSliderHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSpeed = true
+    end
+end)
+
+speedSliderHandle.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSpeed = false
+    end
+end)
+
+-- Input handling for both sliders
 UserInputService.InputChanged:Connect(function(input)
     if isDraggingRadius and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local mouseLocation = UserInputService:GetMouseLocation()
@@ -210,16 +281,60 @@ UserInputService.InputChanged:Connect(function(input)
         radiusSliderHandle.Position = UDim2.new(0, clampedX - (radiusSliderHandle.Size.X.Offset / 2), 0.5, -radiusSliderHandle.Size.Y.Offset / 2)
         updateRadiusFromPosition()
     end
+    
+    if isDraggingSpeed and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local mouseLocation = UserInputService:GetMouseLocation()
+        local relativeX = mouseLocation.X - speedSliderTrack.AbsolutePosition.X
+        local clampedX = math.clamp(relativeX, 0, speedSliderTrack.AbsoluteSize.X)
+        
+        speedSliderHandle.Position = UDim2.new(0, clampedX - (speedSliderHandle.Size.X.Offset / 2), 0.5, -speedSliderHandle.Size.Y.Offset / 2)
+        updateSpeedFromPosition()
+    end
+end)
+
+-- Draggable UI Implementation :cite[2]:cite[5]
+local dragging
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+titleLabel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleLabel.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
 end)
 
 -- --- CORE FUNCTIONALITY ---
 
--- Infinite Jump Functionality
-UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then return end -- Don't jump if typing in chat
-    
-    if isInfJumpEnabled and input.KeyCode == Enum.KeyCode.Space then
-        humanoid.Jump = true
+-- Infinite Jump Functionality :cite[6]
+UserInputService.JumpRequest:Connect(function()
+    if isInfJumpEnabled then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
@@ -262,3 +377,6 @@ end)
 -- Initialize UI state
 updateToggleVisuals(infJumpToggle, isInfJumpEnabled)
 updateToggleVisuals(auraToggle, isAuraEnabled)
+
+-- Set initial walk speed
+humanoid.WalkSpeed = currentWalkSpeed
