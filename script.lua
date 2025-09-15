@@ -1,5 +1,5 @@
 -- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION - EXECUTOR COMPATIBLE z
+-- FINAL COMBINED VERSION - EXECUTOR COMPATIBLEssa
 
 -- Services
 local Players = game:GetService("Players")
@@ -1844,61 +1844,6 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             print("Tree Aura: No trees found within radius", currentTreeAuraRadius)
         end
         treeLastDebugPrint = currentTime
-    end
-end))
-    
-    -- NEW: ADVANCED TREE DISCOVERY SYSTEM (Only run in debug mode)
-    if isTreeDebugMode then
-        print("\n--- 🌳 ADVANCED TREE DISCOVERY SYSTEM 🌳 ---")
-        local potentialTreeFolders = {}
-        local allTreeLikeObjects = {}
-        
-        -- Function to scan for tree-related folders
-        local function scanForTreeFolders(obj, path, depth)
-            if depth > 4 then return end -- Prevent infinite recursion
-            
-            if obj:IsA("Folder") then
-                local folderName = string.lower(obj.Name)
-                if string.find(folderName, "tree") or 
-                   string.find(folderName, "wood") or
-                   string.find(folderName, "forest") or
-                   string.find(folderName, "lumber") or
-                   string.find(folderName, "scene") or
-                   string.find(folderName, "nature") or
-                   string.find(folderName, "environment") then
-                    table.insert(potentialTreeFolders, {
-                        name = obj.Name, 
-                        path = path, 
-                        folder = obj, 
-                        childCount = #obj:GetChildren()
-                    })
-                end
-            end
-            
-            for _, child in ipairs(obj:GetChildren()) do
-                if child:IsA("Folder") then
-                    scanForTreeFolders(child, path .. "/" .. child.Name, depth + 1)
-                end
-            end
-        end
-        
-        -- Scan entire workspace for tree folders
-        scanForTreeFolders(workspace, "workspace", 0)
-        
-        print("🔍 Potential tree folders discovered:")
-        for i, info in ipairs(potentialTreeFolders) do
-            if i <= 5 then -- Reduced from 20 to reduce spam
-                print(string.format("  [%d] 📁 %s | Path: %s | Children: %d", 
-                    i, info.name, info.path, info.childCount))
-            end
-        end
-        
-        print("\n💡 SUGGESTED TREE FOLDER PATHS TO ADD:")
-        for i, info in ipairs(potentialTreeFolders) do
-            if i <= 3 and info.childCount > 0 then -- Reduced from 10 to reduce spam
-                print(string.format("  \"%s\",", info.path:gsub("^workspace/", "")))
-            end
-        end
     end
 end))
 
