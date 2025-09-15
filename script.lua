@@ -1,3 +1,5 @@
+-- LocalScript (put in StarterPlayer > StarterPlayerScripts)
+-- FINAL COMBINED VERSION - EXECUTOR COMPATIBLE z
 
 -- Services
 local Players = game:GetService("Players")
@@ -1844,13 +1846,6 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         treeLastDebugPrint = currentTime
     end
 end))
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
     
     -- NEW: ADVANCED TREE DISCOVERY SYSTEM (Only run in debug mode)
     if isTreeDebugMode then
