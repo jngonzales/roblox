@@ -1,5 +1,3 @@
--- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION - EXECUTOR COMPATIBLEz
 
 -- Services
 local Players = game:GetService("Players")
