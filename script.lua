@@ -1,5 +1,5 @@
 -- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION - EXECUTOR dawda
+-- FINAL COMBINED VERSION - EXECUTOR a
 
 -- Services
 local Players = game:GetService("Players")
@@ -76,7 +76,20 @@ local TREE_NAMES = {
     "Stick", "stick", "Twig", "twig", "Leaf", "leaf", "Apple", "apple", "Fruit", "fruit",
     "Pine", "pine", "Oak", "oak", "Birch", "birch", "Maple", "maple", "Cedar", "cedar",
     -- Generic survival resource models
-    "Resource", "resource", "Item", "item", "Pickup", "pickup", "Collectible", "collectible"
+    "Resource", "resource", "Item", "item", "Pickup", "pickup", "Collectible", "collectible",
+    -- NEW: Numeric patterns found in this specific game
+    "00001", "00002", "00003", "00004", "00005", "00006", "00007", "00008", "00009", "00010",
+    "00011", "00012", "00013", "00014", "00015", "00016", "00017", "00018", "00019", "00020",
+    "00021", "00022", "00023", "00024", "00025", "00026", "00027", "00028", "00029", "00030",
+    "00031", "00032", "00033", "00034", "00035", "00036", "00037", "00038", "00039", "00040",
+    "00041", "00042", "00043", "00044", "00045", "00046", "00047", "00048", "00049", "00050",
+    "00051", "00052", "00053", "00054", "00055", "00056", "00057", "00058", "00059", "00060",
+    "00061", "00062", "00063", "00064", "00065", "00066", "00067", "00068", "00069", "00070",
+    "00071", "00072", "00073", "00074", "00075", "00076", "00077", "00078", "00079", "00080",
+    "00081", "00082", "00083", "00084", "00085", "00086", "00087", "00088", "00089", "00090",
+    "00091", "00092", "00093", "00094", "00095", "00096", "00097", "00098", "00099", "00100",
+    "00101", "00102", "00103", "00104", "00105", "00106", "00107", "00108", "00109", "00110",
+    "00111", "00112", "00113", "00114", "00115", "00116", "00117", "00118", "00119", "00120"
 }
 
 -- Tree farming specific paths (updated for survival games)
@@ -1684,10 +1697,19 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                     local isTreeTarget = false
                     local objName = string.lower(obj.Name)
                     
+                    -- Method 1: Check against known tree names
                     for _, treeName in ipairs(TREE_NAMES) do
                         if string.find(objName, string.lower(treeName)) then
                             isTreeTarget = true
                             break
+                        end
+                    end
+                    
+                    -- Method 2: Check for 5-digit number pattern (this game uses 00001, 00100, etc.)
+                    if not isTreeTarget then
+                        if string.match(obj.Name, "^%d%d%d%d%d$") then -- Matches exactly 5 digits
+                            isTreeTarget = true
+                            print("🌲 Found numeric tree pattern:", obj.Name)
                         end
                     end
                     
@@ -1720,10 +1742,19 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                         local objName = string.lower(obj.Name)
                         local isTreeTarget = false
                         
+                        -- Method 1: Check against known tree names
                         for _, treeName in ipairs(TREE_NAMES) do
                             if string.find(objName, string.lower(treeName)) then
                                 isTreeTarget = true
                                 break
+                            end
+                        end
+                        
+                        -- Method 2: Check for 5-digit number pattern (this game uses 00001, 00100, etc.)
+                        if not isTreeTarget then
+                            if string.match(obj.Name, "^%d%d%d%d%d$") then -- Matches exactly 5 digits
+                                isTreeTarget = true
+                                print("🌲 Found SceneFolder numeric tree:", obj.Name)
                             end
                         end
                         
