@@ -1,5 +1,5 @@
 -- LocalScript (put in StarterPlayer > StarterPlayerScripts)
--- FINAL COMBINED VERSION - EXECUTOR COMPATIBLEssa
+-- FINAL COMBINED VERSION - EXECUTOR dawda
 
 -- Services
 local Players = game:GetService("Players")
@@ -1842,6 +1842,73 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             print("Tree Aura: Found and attacked", #allTrees, "trees")
         else
             print("Tree Aura: No trees found within radius", currentTreeAuraRadius)
+            
+            -- DEBUG: Show what objects ARE nearby (every 10 seconds to prevent spam)
+            if currentTime - treeLastDebugPrint > 10 then
+                print("🔍 DEBUG: Objects within radius " .. currentTreeAuraRadius .. ":")
+                local debugCount = 0
+                for _, obj in ipairs(workspace:GetChildren()) do
+                    if obj ~= player.Character and obj.Name ~= "Camera" then
+                        local targetPart = nil
+                        
+                        if obj:IsA("Model") then
+                            targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                        elseif obj:IsA("BasePart") then
+                            targetPart = obj
+                        end
+                        
+                        if targetPart and targetPart:IsA("BasePart") then
+                            local success, distance = pcall(function()
+                                return (playerPos - targetPart.Position).Magnitude
+                            end)
+                            if success and distance and distance <= currentTreeAuraRadius then
+                                debugCount = debugCount + 1
+                                if debugCount <= 10 then -- Show first 10 objects
+                                    print(string.format("  [%d] %s (%s) - Distance: %.1f", 
+                                        debugCount, obj.Name, obj.ClassName, distance))
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                -- Also check SceneFolder specifically
+                local sceneFolder = workspace:FindFirstChild("SceneFolder")
+                if sceneFolder then
+                    print("🔍 DEBUG: SceneFolder objects within radius:")
+                    local sceneCount = 0
+                    for _, obj in ipairs(sceneFolder:GetChildren()) do
+                        if obj:IsA("Model") or obj:IsA("BasePart") then
+                            local targetPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
+                            
+                            if targetPart then
+                                local success, distance = pcall(function()
+                                    return (playerPos - targetPart.Position).Magnitude
+                                end)
+                                if success and distance and distance <= currentTreeAuraRadius then
+                                    sceneCount = sceneCount + 1
+                                    if sceneCount <= 10 then -- Show first 10 objects
+                                        print(string.format("  Scene[%d] %s (%s) - Distance: %.1f", 
+                                            sceneCount, obj.Name, obj.ClassName, distance))
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    print("Total SceneFolder objects in range:", sceneCount)
+                else
+                    print("🔍 DEBUG: No SceneFolder found in workspace")
+                end
+                
+                print("Total workspace objects in range:", debugCount)
+                print("🔍 Current TREE_NAMES being searched for:")
+                for i = 1, math.min(10, #TREE_NAMES) do
+                    print("  " .. TREE_NAMES[i])
+                end
+                if #TREE_NAMES > 10 then
+                    print("  ... and " .. (#TREE_NAMES - 10) .. " more patterns")
+                end
+            end
         end
         treeLastDebugPrint = currentTime
     end
